@@ -24,3 +24,4 @@
  */
 
 $string['pluginname'] = 'Attendance Activity';
+$string['entriesperweek'] = 'Entries per week';

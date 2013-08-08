@@ -33,18 +33,29 @@ defined('MOODLE_INTERNAL') || die();
  */
 function engagementindicator_attendance_process_edit_form($data) {
     $configdata = array();
-    $elements = array('newposts', 'readposts', 'replies', 'totalposts');
-    foreach ($elements as $element) {
-        if (isset($data->{"forum_no_$element"})) {
-            $configdata["forum_no_$element"] = $data->{"forum_no_$element"};
+    $elements = attendanceindicator_get_statuses($data->id);
+
+    foreach ($elements as $element => $unused) {
+        if (isset($data->{"attendance_no_$element"})) {
+            $configdata["attendance_no_$element"] = $data->{"attendance_no_$element"};
         }
-        if (isset($data->{"forum_max_$element"})) {
-            $configdata["forum_max_$element"] = $data->{"forum_max_$element"};
+        if (isset($data->{"attendance_max_$element"})) {
+            $configdata["attendance_max_$element"] = $data->{"attendance_max_$element"};
         }
-        if (isset($data->{"forum_w_$element"})) {
-            $configdata["forum_w_$element"] = $data->{"forum_w_$element"};
+        if (isset($data->{"attendance_w_$element"})) {
+            $configdata["attendance_w_$element"] = $data->{"attendance_w_$element"};
         }
     }
 
     return $configdata;
+}
+
+function attendanceindicator_get_statuses($courseid) {
+    global $DB;
+    $sql = 'SELECT asess.acronym, asess.description, asess.grade FROM {attendance_statuses} asess
+                 JOIN {attendance} a ON a.id = asess.attendanceid
+                WHERE a.course = ?
+             ORDER BY asess.grade ASC';
+    $statuses = $DB->get_records_sql($sql, array($courseid));
+    return $statuses;
 }

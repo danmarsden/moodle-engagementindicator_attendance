@@ -26,9 +26,11 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once(dirname(__FILE__).'/../indicator.class.php');
+require_once(dirname(__FILE__).'/locallib.php');
 
 class indicator_attendance extends indicator {
     private $currweek;
+    public $statuses;
 
     /**
      * get_risk_for_users_users
@@ -47,25 +49,20 @@ class indicator_attendance extends indicator {
         $params = array('courseid'  => $this->courseid,
                         'startdate' => $startdate,
                         'enddate'   => $enddate);
-        $sql = 'SELECT a.id, al.studentid as userid, al.timetaken, astat.grade, amax.maxgrade
-                FROM   {attendance} a
-                JOIN   {attendance_sessions} asess ON (asess.attendanceid = a.id)
-                JOIN   {attendance_log} al ON (al.sessionid = asess.id)
-                JOIN   {attendance_statuses} astat ON (astat.id = al.statusid)
-                JOIN (SELECT attendanceid, max(grade) as maxgrade FROM {attendance_statuses} GROUP BY attendanceid) amax ON (amax.attendanceid = a.id)
-                WHERE a.course = :courseid
-                      AND al.timetaken > :startdate AND al.timetaken < :enddate';
+
+        $sql = 'SELECT count(st.acronym), st.acronym, al.studentid as userid FROM {attendance_log} al
+                  JOIN {attendance_statuses} st ON st.id = al.statusid
+                  JOIN {attendance_sessions} asess ON asess.id = al.sessionid
+                  JOIN {attendance} a ON a.id = asess.attendanceid
+                 WHERE a.course = :courseid
+                   AND al.timetaken > :startdate AND al.timetaken < :enddate
+              GROUP BY st.acronym, studentid';
         $attrecs = $DB->get_recordset_sql($sql, $params);
-
-
         foreach ($attrecs as $att) {
             if (!isset($attendances[$att->userid])) {
                 $attendances[$att->userid] = array();
-                $attendances[$att->userid]['sumgrade'] = 0;
-                $attendances[$att->userid]['summaxgrade'] = 0;
             }
-            $attendances[$att->userid]['sumgrade'] = $attendances[$att->userid]['sumgrade'] + $att->grade;
-            $attendances[$att->userid]['summaxgrade'] = $attendances[$att->userid]['summaxgrade'] + $att->maxgrade;
+            $attendances[$att->userid][$att->acronym] = $att->count;
         }
 
         $rawdata = new stdClass();
@@ -75,9 +72,8 @@ class indicator_attendance extends indicator {
 
     protected function calculate_risks(array $userids) {
         $risks = array();
-/*
-        $strtotalposts = get_string('e_totalposts', 'engagementindicator_forum');
         $strmaxrisktitle = get_string('maxrisktitle', 'engagementindicator_forum');
+        $strentries = get_string('entriesperweek', 'engagementindicator_attendance');
 
         $startweek = date('W', $this->startdate);
         $this->currweek = date('W') - $startweek + 1;
@@ -87,41 +83,44 @@ class indicator_attendance extends indicator {
             if (!isset($this->rawdata->attendances[$userid])) {
                 // Max risk.
                 $info = new stdClass();
-                $info->risk = 1.0 * ($this->config['w_totalposts'] +
-                                               $this->config['w_replies'] +
-                                               $this->config['w_newposts'] +
-                                               $this->config['w_readposts']);
+                $info->risk = 1.0;
                 $reason = new stdClass();
                 $reason->weighting = '100%';
                 $reason->localrisk = '100%';
-                $reason->logic = "This user has never made a post or had tracked read posts in the ".
+                $reason->logic = "This user has never had attendance marked in the ".
                                  "course and so is at the maximum 100% risk.";
                 $reason->riskcontribution = '100%';
                 $reason->title = $strmaxrisktitle;
+                $reason->entries = 0;
                 $info->info = array($reason);
                 $risks[$userid] = $info;
                 continue;
             }
 
-            $local_risk = $this->calculate('totalposts', $this->rawdata->posts[$userid]['total']);
-            $risk_contribution = $local_risk * $this->config['w_totalposts'];
-            $reason = new stdClass();
-            $reason->weighting = intval($this->config['w_totalposts']*100).'%';
-            $reason->localrisk = intval($local_risk*100).'%';
-            $reason->logic = "0% risk for more than {$this->config['no_totalposts']} posts a week. ".
-                             "100% for {$this->config['max_totalposts']} posts a week.";
-            $reason->riskcontribution = intval($risk_contribution*100).'%';
-            $reason->title = $strtotalposts;
-            $reasons[] = $reason;
-            $risk += $risk_contribution;
-
+            foreach ($this->statuses as $status) {
+                if (!isset($this->rawdata->attendances[$userid][$status->acronym])) {
+                    $this->rawdata->attendances[$userid][$status->acronym] = 0;
+                }
+                $localrisk = $this->calculate($status->acronym, $this->rawdata->attendances[$userid][$status->acronym]);
+                $riskcontribution = $localrisk * $this->config['w_'.$status->acronym];
+                $reason = new stdClass();
+                $reason->weighting = intval($this->config['w_'.$status->acronym]*100).'%';
+                $reason->localrisk = intval($localrisk*100).'%';
+                $reason->logic = "0% risk for {$this->config['no_'.$status->acronym]} entries a week. ".
+                    "100% for {$this->config['max_'.$status->acronym]} entries a week.";
+                $reason->riskcontribution = intval($riskcontribution*100).'%';
+                $reason->title = $status->acronym. ' '.$strentries;
+                $reason->entries = $this->rawdata->attendances[$userid][$status->acronym];
+                $reasons[] = $reason;
+                $risk += $riskcontribution;
+            }
 
             $info = new stdClass();
             $info->risk = $risk;
             $info->info = $reasons;
             $risks[$userid] = $info;
         }
-*/
+
         return $risks;
     }
 
@@ -130,9 +129,14 @@ class indicator_attendance extends indicator {
         $maxrisk = $this->config["max_$type"];
         $norisk = $this->config["no_$type"];
         $weight = $this->config["w_$type"];
-        if ($num / $this->currweek <= $maxrisk) {
+        if ($num < $norisk || ($num == 0 && $norisk == 0)) {
+            return 0;
+        }
+        if ($num >= $maxrisk) {
             $risk = $weight;
-        } else if ($num / $this->currweek < $norisk) {
+        } else if ($num / $this->currweek >= $maxrisk) {
+            $risk = $weight;
+        } else if ($num / $this->currweek > $norisk) {
             $num = $num / $this->currweek;
             $num -= $maxrisk;
             $num /= $norisk - $maxrisk;
@@ -143,6 +147,8 @@ class indicator_attendance extends indicator {
 
     protected function load_config() {
         parent::load_config();
+        $statuses = attendanceindicator_get_statuses($this->courseid);
+        $this->statuses = $statuses;
         $defaults = $this->get_defaults();
         foreach ($defaults as $setting => $value) {
             if (!isset($this->config[$setting])) {
@@ -151,13 +157,31 @@ class indicator_attendance extends indicator {
                 $this->config[$setting] = $this->config[$setting] / 100;
             }
         }
-    }
 
-    public static function get_defaults() {
+    }
+    public function get_defaults() {
         $settings = array();
-        $settings['w_total'] = 0.56;
-        $settings['no_total'] = 1;
-        $settings['max_total'] = 0;
+        $statuses = $this->statuses;
+        foreach ($statuses as $status) {
+            // Set some default values based on default attendance statuses.
+            if ($status->acronym == 'A') {
+                $settings['w_'.$status->acronym] = 0.5;
+                $settings['no_'.$status->acronym] = 0;
+                $settings['max_'.$status->acronym] = 2;
+            } else if ($status->acronym == 'L') {
+                $settings['w_'.$status->acronym] = 0.35;
+                $settings['no_'.$status->acronym] = 1;
+                $settings['max_'.$status->acronym] = 3;
+            } else if ($status->acronym == 'E') {
+                $settings['w_'.$status->acronym] = 0.15;
+                $settings['no_'.$status->acronym] = 4;
+                $settings['max_'.$status->acronym] = 8;
+            } else {
+                $settings['w_'.$status->acronym] = 0;
+                $settings['no_'.$status->acronym] = 0;
+                $settings['max_'.$status->acronym] = 0;
+            }
+        }
         return $settings;
     }
 }

@@ -27,6 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once(dirname(__FILE__).'/../indicator.class.php');
 require_once(dirname(__FILE__).'/indicator.class.php');
+require_once(dirname(__FILE__).'/locallib.php');
 
 class engagementindicator_attendance_thresholds_form {
 
@@ -41,26 +42,31 @@ class engagementindicator_attendance_thresholds_form {
 
         $strmaxrisk = get_string('maxrisk', 'engagementindicator_forum');
         $strnorisk = get_string('norisk', 'engagementindicator_forum');
+        $courseid = optional_param('id', 0, PARAM_INT);
 
-        $defaults = indicator_attendance::get_defaults();
+        $statuses = attendanceindicator_get_statuses($courseid);
 
-        $elements = array('total');
-        foreach ($elements as $element) {
+        foreach ($statuses as $status) {
+            $element = $status->acronym;
+
             $grouparray = array();
             $grouparray[] =& $mform->createElement('static', '', '', "&nbsp;$strnorisk");
             $grouparray[] =& $mform->createElement('text', "attendance_no_$element", '', array('size' => 5));
-            $mform->setDefault("attendance_no_$element", $defaults["no_$element"]);
+            $mform->setType("attendance_no_$element", PARAM_FLOAT);
+            $mform->setDefault("attendance_no_$element", 0);
 
             $grouparray[] =& $mform->createElement('static', '', '', $strmaxrisk);
             $grouparray[] =& $mform->createElement('text', "attendance_max_$element", '', array('size' => 5));
-            $mform->setDefault("attendance_max_$element", $defaults["max_$element"]);
+            $mform->setType("attendance_max_$element", PARAM_FLOAT);
+            $mform->setDefault("attendance_max_$element", 0);
 
             $grouparray[] =& $mform->createElement('static', '', '', get_string('weighting', 'report_engagement'));
             $grouparray[] =& $mform->createElement('text', "attendance_w_$element", '', array('size' => 3));
-            $mform->setDefault("attendance_w_$element", $defaults["w_$element"]*100);
+            $mform->setType("attendance_w_$element", PARAM_FLOAT);
+            $mform->setDefault("attendance_w_$element", 0);
 
             $grouparray[] =& $mform->createElement('static', '', '', '%');
-            $mform->addGroup($grouparray, "group_attendance_$element", get_string("e_$element", "engagementindicator_forum"), '&nbsp;',
+            $mform->addGroup($grouparray, "group_attendance_$element", $status->description, '&nbsp;',
                 false);
         }
     }
