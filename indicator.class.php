@@ -104,11 +104,11 @@ class indicator_attendance extends indicator {
                 $localrisk = $this->calculate($status->acronym, $this->rawdata->attendances[$userid][$status->acronym]);
                 $riskcontribution = $localrisk * $this->config['w_'.$status->acronym];
                 $reason = new stdClass();
-                $reason->weighting = intval($this->config['w_'.$status->acronym]*100).'%';
-                $reason->localrisk = intval($localrisk*100).'%';
+                $reason->weighting = intval($this->config['w_'.$status->acronym] * 100).'%';
+                $reason->localrisk = intval($localrisk * 100).'%';
                 $reason->logic = "0% risk for {$this->config['no_'.$status->acronym]} entries a week. ".
                     "100% for {$this->config['max_'.$status->acronym]} entries a week.";
-                $reason->riskcontribution = intval($riskcontribution*100).'%';
+                $reason->riskcontribution = intval($riskcontribution * 100).'%';
                 $reason->title = $status->acronym. ' '.$strentries;
                 $reason->entries = $this->rawdata->attendances[$userid][$status->acronym];
                 $reasons[] = $reason;

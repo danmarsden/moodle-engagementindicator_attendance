@@ -28,6 +28,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version  = 2013071200;
+$plugin->version  = 2016050500;
 $plugin->requires = 2010112400;  // Requires this Moodle version.
+$plugin->dependencies = array('mod_engagement' => 2015072700);
 $plugin->component = 'engagementindicator_attendance';

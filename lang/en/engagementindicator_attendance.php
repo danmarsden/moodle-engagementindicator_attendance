@@ -24,4 +24,11 @@
  */
 
 $string['pluginname'] = 'Attendance Activity';
+$string['pluginname_help'] = 'This indicator calculates risk rating based on attendance';
 $string['entriesperweek'] = 'Entries per week';
+$string['weighting'] = 'Weighting';
+$string['weighting_help'] = 'This figure shows the amount this item contributes towards the overall risk for the Attendance indicator. The local risk will be multiplied by this to form the risk contribution.';
+$string['localrisk'] = 'Local Risk';
+$string['localrisk_help'] = 'The risk percentage of this alone, out of 100.  The local risk is multiplied by the login weighting to form the Risk Contribution.';
+$string['riskcontribution'] = 'Risk Contribution';
+$string['riskcontribution_help'] = 'The amount of risk this particular Attendance contributes to the overall risk returned for the Attendance indicator.  This is formed by multiplying the Local Risk with the Weighting.  The Risk Contributions of each forum item are summed together to form the overall risk for the indicator.';

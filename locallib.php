@@ -52,7 +52,7 @@ function engagementindicator_attendance_process_edit_form($data) {
 
 function attendanceindicator_get_statuses($courseid) {
     global $DB;
-    $sql = 'SELECT asess.acronym, asess.description, asess.grade FROM {attendance_statuses} asess
+    $sql = 'SELECT DISTINCT asess.acronym, asess.description, asess.grade FROM {attendance_statuses} asess
                  JOIN {attendance} a ON a.id = asess.attendanceid
                 WHERE a.course = ?
              ORDER BY asess.grade ASC';
